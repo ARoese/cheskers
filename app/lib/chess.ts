@@ -104,6 +104,7 @@ const pawnExpands = (board: Board, location: Coordinates): Move[] => {
 const chessExpands : Record<ChessPieceType, chessPieceExpander> = {
     pawn: pawnExpands,
     pessantable: pawnExpands,
+    // TODO: castling
     king: function (board: Board, location: Coordinates): Move[] {
         const offsets : Coordinates[] = [...Object.values(directions)];
         const moves : Move[] = offsets.map((offset) => {

@@ -1,20 +1,23 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import GamePiece from "./GamePiece";
 import {fromCoordinates, getValidMoves, makeBoard, Move, performMove, pieceAt, toCoordinates } from "./lib/shared";
 
 function GameBoard({className=""} : {className? : string}) {
-    const [board, setBoard] = useState(makeBoard("chess", "checkers"));
+    const [board, setBoard] = useState(makeBoard("checkers", "chess"));
     const [selected, setSelected] = useState(null as number | null);
     const [capturing, setCapturing] =  useState(null as number | null);
     const selectedBgColor = "bg-blue-300";
     const highlightBgColor = "bg-yellow-300";
     const captureBgColor = "bg-red-500";
     
-    const validMoves = getValidMoves(board, selected);
-    const movesOnto : Record<number, Move[]> = Object.fromEntries(
-        [...Array(8*8).keys()].map(
-                (loc) => [loc, validMoves.filter((move) => fromCoordinates(move.to) == loc)]
-            )
+    const validMoves = useMemo(() => getValidMoves(board, selected), [board, selected]);
+    const movesOnto : Record<number, Move[]> = useMemo(() => 
+        Object.fromEntries(
+            [...Array(8*8).keys()].map(
+                    (loc) => [loc, validMoves.filter((move) => fromCoordinates(move.to) == loc)]
+                )
+        ),
+        [validMoves]
     );
 
     function checkedSetSelected(sel : number){
