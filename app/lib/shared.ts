@@ -1,7 +1,7 @@
-import { CheckersPiece, CheckersPieceInfo, expandMove as expandCheckersMove} from "./checkers";
-import { ChessPiece, expandChessMove } from "./chess";
+import { CheckersPieceType, CheckersPiece, expandMove as expandCheckersMove} from "./checkers";
+import { ChessPiece, ChessPieceType, expandMove as expandChessMove } from "./chess";
 
-export type PieceType = CheckersPiece | ChessPiece;
+export type PieceType = CheckersPieceType | ChessPieceType;
 export const pieceTypes = ["double", "single", "pawn", "king", "queen", "rook", "bishop", "knight"];
 export type Game = "chess" | "checkers";
 // In a chess game, "red" is used as "white."
@@ -21,10 +21,12 @@ export type Board = {
     white: Game
 };
 
+export type MaybeCoordinates = Coordinates | null;
+
 export type Move = {
     from: Coordinates,
     to: Coordinates,
-    capturedLocations: Coordinates[]
+    captured: MaybeCoordinates
 };
 
 export type Coordinates = {
@@ -70,6 +72,10 @@ export function pieceAt(board : Board, location : Coordinates) : MaybePiece {
     return board.pieces[location.row][location.column];
 }
 
+export function hasPiece(board : Board, location : Coordinates) : boolean {
+    return pieceAt(board, location) != undefined;
+}
+
 export function getValidMoves(board : Board, from : number | null) : Move[] {
     if(from == null){
         return [];
@@ -82,8 +88,8 @@ export function getValidMoves(board : Board, from : number | null) : Move[] {
 
     // expand based on which game is being played
     return sourcePiece.game == "checkers" 
-        ? expandCheckersMove(board, fromCoords, sourcePiece as CheckersPieceInfo) 
-        : expandChessMove(board, fromCoords, sourcePiece);
+        ? expandCheckersMove(board, fromCoords, sourcePiece as CheckersPiece) 
+        : expandChessMove(board, fromCoords, sourcePiece as ChessPiece);
 }
 
 export function makePiece(type: PieceType, color: Color, game: Game) {
@@ -94,24 +100,46 @@ export function makePiece(type: PieceType, color: Color, game: Game) {
     };
 }
 
+export function reverseCoordinates(toReverse : Coordinates) : Coordinates {
+    return {
+        row: 7-toReverse.row,
+        column: toReverse.column
+    }
+}
+
 export function performMove(board : Board, move : Move) : Board {
     const newBoard : Board = copyBoard(board);
-    for(const capture of move.capturedLocations){
-        newBoard.pieces[capture.row][capture.column] = undefined;
+    if(move.captured != null){
+        newBoard.pieces[move.captured.row][move.captured.column] = undefined;
     }
     const movingPiece = newBoard.pieces[move.from.row][move.from.column];
-    newBoard.pieces[move.to.row][move.to.column] = movingPiece;
-    newBoard.pieces[move.from.row][move.from.column] = undefined;
-
     if(movingPiece == undefined){
         throw new Error("Tried to move a nonexistent piece");
     }
+    newBoard.pieces[move.to.row][move.to.column] = movingPiece;
+    newBoard.pieces[move.from.row][move.from.column] = undefined;
+
+    
 
     // checkers kinging
-    if( move.to.row == (movingPiece.color == "black" ? 7 : 0) ){
+    if( movingPiece.game == "checkers" && move.to.row == (movingPiece.color == "black" ? 7 : 0) ){
         console.log("checker got kinged");
         movingPiece.type = "double";
     }
+
+    // en pessant transitions
+    // all pessantable pawns transition into normal pawns each turn
+    newBoard.pieces.flat().forEach(piece => {
+        if(piece!=undefined && piece.type == "pessantable"){
+            piece.type = "pawn";
+        }
+    });
+    // a pawn the moves 2 spaces in 1 turn becomes pessantable
+    if( movingPiece.type == "pawn" && Math.abs(move.from.row - move.to.row) == 2){
+        console.log("pessantable created");
+        movingPiece.type = "pessantable";
+    }
+    
 
     return newBoard;
 }

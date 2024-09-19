@@ -1,10 +1,10 @@
-import { addCoords, Board, Coordinates, Move, onBoard, Piece, pieceAt, scaleCoords } from "./shared";
+import { addCoords, Board, Coordinates, hasPiece, Move, onBoard, Piece, pieceAt, scaleCoords } from "./shared";
 
-export type CheckersPiece = "double" | "single";
+export type CheckersPieceType = "double" | "single";
 export type Expander = (piece : Piece) => Move[];
 export type OffsetExpander = (board : Board, location : Coordinates, piece : Piece) => Move[];
 
-const checkersMoves : Record<CheckersPiece, Coordinates[]> = {
+const checkersMoves : Record<CheckersPieceType, Coordinates[]> = {
     // valid movements of a checkers king
     double: [
         {
@@ -38,11 +38,11 @@ const checkersMoves : Record<CheckersPiece, Coordinates[]> = {
 }
 
 // a piece that is definitely a checkers piece
-export type CheckersPieceInfo = Piece & {type : CheckersPiece};
+export type CheckersPiece = Piece & {type : CheckersPieceType};
 
 // get a list off offsets a piece can move into
 // reverses the direction based on piece color
-function expandSimpleOffsets(piece : CheckersPieceInfo) : Coordinates[] {
+function expandSimpleOffsets(piece : CheckersPiece) : Coordinates[] {
     return piece.color == "black" 
         ? checkersMoves[piece.type] 
         : checkersMoves[piece.type].map((offset) => scaleCoords(-1, offset));
@@ -52,10 +52,10 @@ function expandSimpleOffsets(piece : CheckersPieceInfo) : Coordinates[] {
 // take capture opportunities some other way. Maybe add a "yield" field to the move object which
 // says it's time to give up control because there are no captures possible
 // get all valid moves a piece can make on a board
-function expandCaptureMoves(board : Board, captureMove : Move, piece : CheckersPieceInfo) : Move[] {
+function expandCaptureMoves(board : Board, location : Coordinates, piece : CheckersPiece) : Move[] {
     // TODO: this doesn't quite work
     const captures = expandSimpleOffsets(piece)
-        .map((offset) => [offset, addCoords(captureMove.to, offset)])
+        .map((offset) => [offset, addCoords(location, offset)])
         // find any simple move that would land on a piece 
         // that piece must also be of a different color
         // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -69,54 +69,38 @@ function expandCaptureMoves(board : Board, captureMove : Move, piece : CheckersP
         // with their start at the original move's location, and the end in the new destination
         // add the captured piece to the capture list
         .map(([offset, captured]) => ({
-            from: captureMove.from, 
-            to: addCoords(captureMove.to, offset), 
-            capturedLocations: [...captureMove.capturedLocations, captured]
+            from: location, 
+            to: addCoords(location, offset), 
+            captured
             })
         )
         // only produce moves that are actually on the board
         .filter((move) => onBoard(move.to))
         // cannot move onto another piece
-        .filter((move) => pieceAt(board, move.to) == undefined);
+        .filter((move) => !hasPiece(board, move.to));
     
         return captures;
-    if(captures.length == 0){
-        // we call this function with an initial fake capture of self.
-        // we don't return this fake capture.
-        return captureMove.from == captureMove.to ? [] : [captureMove];
-    }else{
-        console.log("captures1:", captures);
-        // recursively find any captures that could be made from each of these new captures
-        const res = captures.flatMap((captureMove) => expandCaptureMoves(board, captureMove, piece));
-        console.log("captures2:", res);
-        return res;
-    }
 }
 
 // get all valid simple moves
-export function expandMove(board : Board, location : Coordinates, piece : CheckersPieceInfo) : Move[] {
+export function expandMove(board : Board, location : Coordinates, piece : CheckersPiece) : Move[] {
     // get simple moves that can be legally made
     const simpleMoves = expandSimpleOffsets(piece)
         // map into moves
         .map((offset) => ({
                 from: location, 
                 to: addCoords(location, offset),
-                capturedLocations: []
+                captured: null
             })
         )
         // cannot move off board
         .filter((move) => onBoard(move.to))
         // cannot move onto another piece
-        .filter((move) => pieceAt(board, move.to) == undefined);
+        .filter((move) => !hasPiece(board, move.to));
     console.log("simple offsets:", expandSimpleOffsets(piece))
     console.log("simple moves:", simpleMoves)
     // get captures that can be legally made
-    // this will use recursion to find all valid end-destinations of multi-captures
-    const captureMoves = expandCaptureMoves(board, {
-        from: location,
-        to: location,
-        capturedLocations: []
-    }, piece);
+    const captureMoves = expandCaptureMoves(board, location, piece);
 
     return [...simpleMoves, ...captureMoves];
 }

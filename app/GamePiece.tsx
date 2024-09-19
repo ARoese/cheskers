@@ -9,6 +9,7 @@ const pieceIcons : Record<PieceType,IconDefinition> = {
     double: faDiamond,
     single: faDotCircle,
     pawn: faChessPawn,
+    pessantable: faChessPawn,
     king: faChessKing,
     queen: faChessQueen,
     rook: faChessRook,
@@ -16,8 +17,17 @@ const pieceIcons : Record<PieceType,IconDefinition> = {
     knight: faChessKnight
 };
 
-type args = {piece : MaybePiece, className? : string, onClick? : () => void};
-function GamePiece({piece, className = "", onClick = (() => null)} : args) {
+type args = {
+    piece : MaybePiece,
+    className? : string,
+    onClick? : () => void,
+    onMouseOver? : () => void,
+    onMouseOut? : () => void
+};
+
+const defaultHandler = () => null;
+
+function GamePiece({piece, className = "", onClick = defaultHandler, onMouseOut = defaultHandler, onMouseOver = defaultHandler} : args) {
     let pieceColor;
     if(piece){
         if(piece.game == "chess"){
@@ -32,7 +42,11 @@ function GamePiece({piece, className = "", onClick = (() => null)} : args) {
     }
 
     return ( 
-        <div className={`aspect-square text-center p-2 ${className} ${pieceColor}`} onClick={onClick}>
+        <div 
+            className={`aspect-square text-center p-2 ${className} ${pieceColor}`} 
+            onClick={onClick}
+            onMouseOver={onMouseOver}
+            onMouseOut={onMouseOut}>
             {
                 piece == undefined
                 ? <></>
