@@ -1,36 +1,57 @@
 import { useMemo, useState } from "react";
 import GamePiece from "./GamePiece";
-import {fromCoordinates, getValidMoves, makeBoard, Move, performMove, pieceAt, toCoordinates } from "./lib/shared";
+import {Board, fromCoordinates, getAllBoardMoves, getValidMoves, makeBoard, Move, performMove, pieceAt, toCoordinates } from "./lib/shared";
+
+function getValidMovesCombined(boardMoves : Record<number, Move[]>, selected : number | null) : [Move[], Record<number, Move[]>]{
+    const validMoves = selected == null ? [] : boardMoves[selected];
+    const movesOnto : Record<number, Move[]> = Object.fromEntries(
+        [...Array(8*8).keys()].map((loc) => 
+            [loc, validMoves.filter((move) => fromCoordinates(move.to) == loc)]
+        )
+    )
+
+    return [
+        validMoves, // all valid moves
+        movesOnto // mapping from squares to any moves which target them
+    ];
+}
 
 function GameBoard({className=""} : {className? : string}) {
-    const [board, setBoard] = useState(makeBoard("checkers", "chess"));
+    const [board, setBoard] = useState(makeBoard("chess", "chess"));
     const [selected, setSelected] = useState(null as number | null);
     const [capturing, setCapturing] =  useState(null as number | null);
     const selectedBgColor = "bg-blue-300";
     const highlightBgColor = "bg-yellow-300";
     const captureBgColor = "bg-red-500";
-    
-    const validMoves = useMemo(() => getValidMoves(board, selected), [board, selected]);
-    const movesOnto : Record<number, Move[]> = useMemo(() => 
-        Object.fromEntries(
-            [...Array(8*8).keys()].map(
-                    (loc) => [loc, validMoves.filter((move) => fromCoordinates(move.to) == loc)]
-                )
-        ),
-        [validMoves]
-    );
+    const boardMoves = useMemo(() => getAllBoardMoves(board), [board]);
+    const [validMoves, movesOnto] = useMemo(() => getValidMovesCombined(boardMoves, selected), [boardMoves, selected]);
 
     function checkedSetSelected(sel : number){
-        if(pieceAt(board, toCoordinates(sel)) == undefined){
+        const targetPiece = pieceAt(board, toCoordinates(sel));
+        if(targetPiece == undefined || targetPiece.color != board.state.turn){
             setSelected(null);
         }else{
             setSelected(sel);
         }
     }
 
-    //console.log("moves onto:", movesOnto);
+    function doMove(move : Move){
+        const nextBoard = performMove(board, move);
+        setBoard(nextBoard);
+        // if multicapturing, select that piece
+        if(nextBoard.state.multiCapturing != null){
+            setSelected(fromCoordinates(nextBoard.state.multiCapturing));
+        // two turns can't be taken in series outside of checkers multicapturing, so
+        // just select null and wait for the user to select that themselves
+        }else{
+            setSelected(null);
+        }
+        
+        setCapturing(null);
+    }
 
     return ( 
+        <>
         <div 
             className={`aspect-square 
                         grid grid-cols-8 grid-rows-8 grid-flow-row
@@ -48,15 +69,15 @@ function GameBoard({className=""} : {className? : string}) {
                         bgColor = selectedBgColor
                     }
                     const movesOntoThis = movesOnto[i]
+                    if(movesOntoThis.length > 1){
+                        throw new Error("multiple moves onto the same square. This should not be possible. Please debug.");
+                    }
                     let onMouseOver = undefined;
                     if(movesOntoThis.length != 0){
                         bgColor = highlightBgColor;
                         const moveToDo = movesOntoThis[0];
                         onClick = () => {
-                            // TODO: add selector in the case where there are multiple paths to a given destination
-                            setBoard(performMove(board, moveToDo));
-                            setSelected(fromCoordinates(moveToDo.to));
-                            setCapturing(null);
+                            doMove(moveToDo);
                         }
                         if(moveToDo.captured != null){
                             onMouseOver = () => {
@@ -83,6 +104,18 @@ function GameBoard({className=""} : {className? : string}) {
             )
             }
         </div>
+        <div>
+            <p>Turn: {board.state.turn}</p>
+            <p>
+                Multi-capture: {
+                    board.state.multiCapturing != null 
+                    ? `row: ${board.state.multiCapturing.row}, column: ${board.state.multiCapturing.column}`
+                    : "no multicapture"
+                }
+            </p>
+            <p>Winner: {board.state.winner == null ? "none" : board.state.winner}</p>
+        </div>
+        </>
      );
 }
 

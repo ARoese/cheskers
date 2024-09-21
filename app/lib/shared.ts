@@ -14,11 +14,21 @@ export type Piece = {
 }
 
 export type MaybePiece = Piece | undefined;
+type GameState = {
+    turn: Color, // whose turn it currently is
+    // whether the board is in a "capture only" state.
+    // This could happen because a checkers piece is able to capture
+    // this can be restricted so that only a specific piece is allowed
+    // to capture
+    multiCapturing: MaybeCoordinates,
+    winner: Color | null
+}
 // Boards are organized ALWAYS with "white" at the bottom
 export type Board = {
     pieces: MaybePiece[][],
     black: Game,
-    white: Game
+    white: Game,
+    state: GameState
 };
 
 export type MaybeCoordinates = Coordinates | null;
@@ -38,6 +48,10 @@ export function toCoordinates(index : number) : Coordinates {
     const row = Math.floor(index/8);
     const column = index - row*8;
     return {row, column};
+}
+
+export function coordsEqual(a : Coordinates, b : Coordinates) {
+    return a.row == b.row && b.column == b.column;
 }
 
 export function fromCoordinates(coords : Coordinates) : number {
@@ -76,14 +90,38 @@ export function hasPiece(board : Board, location : Coordinates) : boolean {
     return pieceAt(board, location) != undefined;
 }
 
-export function getValidMoves(board : Board, from : number | null) : Move[] {
-    if(from == null){
-        return [];
+export function getAllBoardMoves(board : Board) : Record<number, Move[]> {
+    const allMoves : [number, Move[]][] = board.pieces.flat()
+        // evaluate all valid moves for every position
+        .map((piece, i) => [i, piece != undefined ? getValidMoves(board, i) : []])
+    
+    
+
+    const currentGame = board.state.turn == "red" ? board.white : board.black;
+    if(currentGame == "chess"){
+        return Object.fromEntries(allMoves);
     }
+    
+    // checkers player MUST make a capture move if one is available
+    const canCapture = allMoves.flatMap((s) => s[1]).some((move) => move.captured != null);
+    if(canCapture){
+        // filter out non-capturing moves
+        allMoves.forEach(
+            (elem) => elem[1] = elem[1].filter((move) => move.captured != null)
+        );
+    }
+    
+
+    return Object.fromEntries(allMoves);
+}
+
+export function getValidMoves(board : Board, from : number) : Move[] {
     const fromCoords = toCoordinates(from);
     const sourcePiece = pieceAt(board, fromCoords);
-    if(!sourcePiece){
-        return []; // an empty space has no valid moves to make
+    if(sourcePiece == undefined || sourcePiece.color != board.state.turn){
+        // an empty space has no valid moves to make
+        // a piece cannot move unless it is its turn
+        return []; 
     }
 
     // expand based on which game is being played
@@ -107,24 +145,64 @@ export function reverseCoordinates(toReverse : Coordinates) : Coordinates {
     }
 }
 
-export function performMove(board : Board, move : Move) : Board {
-    const newBoard : Board = copyBoard(board);
-    if(move.captured != null){
-        newBoard.pieces[move.captured.row][move.captured.column] = undefined;
+/** Apply special game rules to the new board state.
+ * 
+ *  newBoard - board state after the basic movement has been applied. This will be mutated then returned.
+ *  move - the move performed
+ *  movingPiece - the piece object being moved.
+ * 
+ */
+function applySpecialRules(newBoard : Board, move : Move, movingPiece : Piece, takenPiece : MaybePiece) : Board {
+    // win/loss scenarios
+    // chess loss
+    if(takenPiece != undefined && takenPiece.type == "king"){
+        // opposite color wins
+        newBoard.state.winner = takenPiece.color == "red" ? "black" : "red";
     }
-    const movingPiece = newBoard.pieces[move.from.row][move.from.column];
-    if(movingPiece == undefined){
-        throw new Error("Tried to move a nonexistent piece");
+
+    //const pieceCounts : [number, number] = newBoard.pieces.flat()
+    //    .reduce(
+    //        ([red, black], piece) => {
+    //            if(piece == undefined){return [red,black]}
+    //            return piece.color == "red" ? [red+1,black] : [red,black+1]
+    //        },
+    //        [0,0]
+    //    );
+
+    const [hasRed, hasBlack] : [boolean, boolean] = (["red", "black"]).map(
+        (color) => newBoard.pieces.flat().some(
+            (piece) => piece != undefined && piece.color == color
+        )
+    ) as [boolean, boolean];
+    console.log(hasRed, hasBlack)
+    if(!hasBlack){
+        newBoard.state.winner = "red";
+    }else if(!hasRed){
+        newBoard.state.winner = "black";
     }
-    newBoard.pieces[move.to.row][move.to.column] = movingPiece;
-    newBoard.pieces[move.from.row][move.from.column] = undefined;
 
-    
-
-    // checkers kinging
-    if( movingPiece.game == "checkers" && move.to.row == (movingPiece.color == "black" ? 7 : 0) ){
+    // checkers kinging and multi-attacking
+    if( movingPiece.type == "single" && move.to.row == (movingPiece.color == "black" ? 7 : 0) ){
         console.log("checker got kinged");
         movingPiece.type = "double";
+        // a kinged piece does not continue multi-attacking
+        newBoard.state.multiCapturing = null;
+        // swap to other player's turn
+        newBoard.state.turn = newBoard.state.turn == "red" ? "black" : "red";
+    }else if(movingPiece.game == "checkers" && move.captured != null){
+        // update multi-capturing position
+        newBoard.state.multiCapturing = move.to; 
+        // check if this piece has any valid captures to make
+        const validCaptures = getValidMoves(newBoard, fromCoordinates(move.to));
+        if(validCaptures.length == 0){ //no valid captures
+            // swap to other player's turn
+            newBoard.state.turn = newBoard.state.turn == "red" ? "black" : "red";
+            // leave capture-only state
+            newBoard.state.multiCapturing = null;
+        }
+    }else{
+        // swap to other player's turn
+        newBoard.state.turn = newBoard.state.turn == "red" ? "black" : "red";
     }
 
     // en pessant transitions
@@ -139,16 +217,48 @@ export function performMove(board : Board, move : Move) : Board {
         console.log("pessantable created");
         movingPiece.type = "pessantable";
     }
-    
 
     return newBoard;
+}
+
+/** Given a board state and a move, return a new board representing the state of the game
+ *  after that move has been made.
+ */
+export function performMove(board : Board, move : Move) : Board {
+
+    // copy the board and move the piece according to the move
+    const newBoard : Board = copyBoard(board);
+    const takenPiece : MaybePiece = move.captured != null
+        ? newBoard.pieces[move.captured.row][move.captured.column] 
+        : undefined;
+    if(move.captured != null){
+        newBoard.pieces[move.captured.row][move.captured.column] = undefined;
+    }
+    const movingPiece = newBoard.pieces[move.from.row][move.from.column];
+    if(movingPiece == undefined){
+        throw new Error("Tried to move a nonexistent piece");
+    }
+    if(movingPiece.color != board.state.turn){
+        throw new Error("attempted to move a piece outside of its turn");
+    }
+
+    newBoard.pieces[move.to.row][move.to.column] = movingPiece;
+    newBoard.pieces[move.from.row][move.from.column] = undefined;
+
+    // apply any special game rules and return
+    return applySpecialRules(newBoard, move, movingPiece, takenPiece);
 }
 
 export function emptyBoard(white : Game, black : Game) : Board {
     return {
         pieces: [...Array(8).keys()].map(() => [...Array(8).keys()].map(() => undefined)),
         black,
-        white
+        white,
+        state: {
+            turn: "red",
+            multiCapturing: null,
+            winner: null
+        }
     };
 }
 
@@ -156,7 +266,12 @@ export function copyBoard(board : Board) : Board {
     return {
         pieces: board.pieces.map((row) => [...row]),
         black: board.black,
-        white: board.white
+        white: board.white,
+        state: {
+            turn: board.state.turn,
+            multiCapturing: board.state.multiCapturing,
+            winner: board.state.winner
+        }
     }
 }
 
@@ -187,6 +302,6 @@ export function makeBoard(white : Game, black : Game) : Board {
         board.pieces[6] = checkersOdd .map((type) => type == undefined ? undefined : makePiece("single", "red", "checkers"));
         board.pieces[7] = checkersEven.map((type) => type == undefined ? undefined : makePiece("single", "red", "checkers"));
     }
-    //console.log(board.pieces);
+    
     return board;
 }

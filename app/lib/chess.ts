@@ -117,8 +117,6 @@ const chessExpands : Record<ChessPieceType, chessPieceExpander> = {
             } as Move;
         });
 
-        console.log("kingMoves:", moves)
-
         return moves;
     },
     queen: function (board: Board, location: Coordinates): Move[] {
@@ -206,6 +204,6 @@ export function expandMove(board : Board, location : Coordinates, piece : ChessP
         // @ts-expect-error if the capture field is set, there is a piece on the board
         .filter((move) => (move.captured == null || pieceAt(board, move.captured).color != piece.color))
         
-    console.log("moves:", moves);
+    //console.log("moves:", moves);
     return moves;
 }

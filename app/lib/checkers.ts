@@ -1,4 +1,4 @@
-import { addCoords, Board, Coordinates, hasPiece, Move, onBoard, Piece, pieceAt, scaleCoords } from "./shared";
+import { addCoords, Board, Coordinates, coordsEqual, hasPiece, Move, onBoard, Piece, pieceAt, scaleCoords } from "./shared";
 
 export type CheckersPieceType = "double" | "single";
 export type Expander = (piece : Piece) => Move[];
@@ -82,8 +82,12 @@ function expandCaptureMoves(board : Board, location : Coordinates, piece : Check
         return captures;
 }
 
-// get all valid simple moves
+// get all valid moves
 export function expandMove(board : Board, location : Coordinates, piece : CheckersPiece) : Move[] {
+    // only the multi-capturing piece may move
+    if(board.state.multiCapturing != null && !coordsEqual(board.state.multiCapturing, location)){
+        return [];
+    }
     // get simple moves that can be legally made
     const simpleMoves = expandSimpleOffsets(piece)
         // map into moves
@@ -97,10 +101,18 @@ export function expandMove(board : Board, location : Coordinates, piece : Checke
         .filter((move) => onBoard(move.to))
         // cannot move onto another piece
         .filter((move) => !hasPiece(board, move.to));
-    console.log("simple offsets:", expandSimpleOffsets(piece))
-    console.log("simple moves:", simpleMoves)
+    //console.log("simple offsets:", expandSimpleOffsets(piece))
+    //console.log("simple moves:", simpleMoves)
     // get captures that can be legally made
     const captureMoves = expandCaptureMoves(board, location, piece);
+    
+    if(board.state.multiCapturing != null){
+        // only captures can be made when multi-capturing
+        return captureMoves;
+    }
 
-    return [...simpleMoves, ...captureMoves];
+    // checkers pieces MUST capture when possible
+    return captureMoves.length != 0
+        ? captureMoves
+        : simpleMoves
 }
