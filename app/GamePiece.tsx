@@ -1,10 +1,10 @@
-import { MaybePiece } from "./lib/shared";
+import { MaybePiece } from "./lib/types/Piece";
 import { 
     faChessPawn, faChessKing, faChessKnight, faChessBishop, 
     faChessRook, faChessQueen, IconDefinition, 
     faDotCircle, faDiamond } from "@fortawesome/free-solid-svg-icons";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import type { PieceType } from "./lib/shared";
+import type { PieceType } from "./lib/games";
 const pieceIcons : Record<PieceType,IconDefinition> = {
     double: faDiamond,
     single: faDotCircle,

@@ -1,4 +1,8 @@
-import { addCoords, Board, Coordinates, hasPiece, Move, onBoard, Piece, pieceAt, reverseCoordinates, scaleCoords } from "./shared";
+import { Move } from "../moves";
+import { Board, onBoard, pieceAt, hasPiece } from "../types/Board";
+import { Coordinates, scaleCoords, addCoords, reverseCoordinates } from "../types/Coordinates";
+import { Piece } from "../types/Piece";
+
 export type ChessPieceType = "pawn" | "king" | "queen" | "rook" | "bishop" | "knight" | "pessantable";
 export type ChessPiece = Piece & {game: "chess", type : ChessPieceType};
 

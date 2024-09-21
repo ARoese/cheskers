@@ -1,4 +1,7 @@
-import { addCoords, Board, Coordinates, coordsEqual, hasPiece, Move, onBoard, Piece, pieceAt, scaleCoords } from "./shared";
+import { Move } from "../moves";
+import { Board, pieceAt, onBoard, hasPiece } from "../types/Board";
+import { Coordinates, scaleCoords, addCoords, coordsEqual } from "../types/Coordinates";
+import { Piece } from "../types/Piece";
 
 export type CheckersPieceType = "double" | "single";
 export type Expander = (piece : Piece) => Move[];
