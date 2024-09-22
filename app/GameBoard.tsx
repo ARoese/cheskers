@@ -1,9 +1,8 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import GamePiece from "./GamePiece";
-import { Move, getAllBoardMoves, getBestMove, performMove, rateBoard } from "./lib/moves";
-import { makeBoard, pieceAt } from "./lib/types/Board";
-import { coordsToString, fromCoordinates, toCoordinates } from "./lib/types/Coordinates";
-import { Color } from "./lib/games";
+import { Move, getAllBoardMoves } from "./lib/moves";
+import { Board, pieceAt } from "./lib/types/Board";
+import { fromCoordinates, toCoordinates } from "./lib/types/Coordinates";
 
 function getValidMovesCombined(boardMoves : Record<number, Move[]>, selected : number | null) : [Move[], Record<number, Move[]>]{
     const validMoves = selected == null ? [] : boardMoves[selected];
@@ -19,20 +18,32 @@ function getValidMovesCombined(boardMoves : Record<number, Move[]>, selected : n
     ];
 }
 
-function GameBoard({className=""} : {className? : string}) {
-    const [board, setBoard] = useState(makeBoard("checkers", "checkers"));
+type args = {
+    className? : string, 
+    board: Board,
+    doMove : (move : Move) => void
+};
+
+const selectedBgColor = "bg-blue-300";
+const highlightBgColor = "bg-yellow-300";
+const captureBgColor = "bg-red-500";
+
+function GameBoard({className="", board, doMove} : args) {
     const [selected, setSelected] = useState(null as number | null);
     const [capturing, setCapturing] =  useState(null as number | null);
-    const [realPlayer, setRealPlayer] = useState("red" as Color);
-    const selectedBgColor = "bg-blue-300";
-    const highlightBgColor = "bg-yellow-300";
-    const captureBgColor = "bg-red-500";
+    
     const boardMoves = useMemo(() => getAllBoardMoves(board), [board]);
     const [, movesOnto] = useMemo(() => getValidMovesCombined(boardMoves, selected), [boardMoves, selected]);
-    const bestMove = useMemo(() => getBestMove(board, 2), [board]);
+    
+    // whenever board updates, reset selection and capturing
+    useEffect(() => {setSelected(null); setCapturing(null)}, [board]);
 
-    if(board.state.turn != realPlayer && bestMove != null){
-        doMove(bestMove);
+    if(board.state.multiCapturing != null){
+        const multi = fromCoordinates(board.state.multiCapturing);
+        if(selected != multi){
+            setSelected(multi);
+        }
+        
     }
 
     function checkedSetSelected(sel : number){
@@ -44,42 +55,8 @@ function GameBoard({className=""} : {className? : string}) {
         }
     }
 
-    function doMove(move : Move){
-        const nextBoard = performMove(board, move);
-        setBoard(nextBoard);
-        // if multicapturing, select that piece
-        if(nextBoard.state.multiCapturing != null){
-            setSelected(fromCoordinates(nextBoard.state.multiCapturing));
-        // two turns can't be taken in series outside of checkers multicapturing, so
-        // just select null and wait for the user to select that themselves
-        }else{
-            setSelected(null);
-        }
-        
-        setCapturing(null);
-    }
-
     return ( 
         <>
-        <button onClick={() => bestMove != null ? doMove(bestMove) : null}>
-            Play best move
-        </button>
-        <p>Playing as: 
-            <select 
-                value={realPlayer}
-                className="text-black"
-                onChange={
-                    (e) => {
-                        // @ts-expect-error this will always be a valid string
-                        setRealPlayer(e.target.value);
-                    }
-                }
-                >
-                <option value="red">red</option>
-                <option value="black">black</option>
-            </select>
-        </p>
-        
         <div 
             className={`aspect-square 
                         grid grid-cols-8 grid-rows-8 grid-flow-row
@@ -106,6 +83,7 @@ function GameBoard({className=""} : {className? : string}) {
                         const moveToDo = movesOntoThis[0];
                         onClick = () => {
                             doMove(moveToDo);
+                            setSelected(null);
                         }
                         if(moveToDo.captured != null){
                             onMouseOver = () => {
@@ -131,25 +109,6 @@ function GameBoard({className=""} : {className? : string}) {
                 }
             )
             }
-        </div>
-        <div>
-            <p>Turn: {board.state.turn}</p>
-            <p>
-                Multi-capture: {
-                    board.state.multiCapturing != null 
-                    ? coordsToString(board.state.multiCapturing)
-                    : "no multicapture"
-                }
-            </p>
-            <p>Winner: {board.state.winner == null ? "none" : board.state.winner}</p>
-            <p>Board rating: {rateBoard(board)}</p>
-            <p>
-                Best move: {
-                    bestMove != null 
-                    ? `${coordsToString(bestMove.from)} => ${coordsToString(bestMove.to)}`
-                    : "none"
-                }
-            </p>
         </div>
         </>
      );
