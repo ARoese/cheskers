@@ -17,3 +17,11 @@ export function makePiece(type: PieceType, color: Color, game: Game) {
         game
     };
 }
+
+export function copyPiece(piece: Piece) : Piece{
+    return {
+        color: piece.color,
+        game: piece.game,
+        type: piece.type
+    }
+}

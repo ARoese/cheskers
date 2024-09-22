@@ -2,8 +2,10 @@ import { CheckersPiece, expandMove as expandCheckersMove } from "./games/checker
 import { ChessPiece, expandMove as expandChessMove } from "./games/chess";
 import { Board, copyBoard, pieceAt } from "./types/Board";
 import { fromCoordinates, toCoordinates, Coordinates, MaybeCoordinates } from "./types/Coordinates";
-import { Piece, MaybePiece } from "./types/Piece";
+import { Piece, MaybePiece, copyPiece } from "./types/Piece";
 
+//TODO: use immutable.ts or something similar to garuntee immutability
+//of the board. Immutability garuntee should be RECURSIVE.
 
 /** Apply special game rules to the new board state.
  *
@@ -93,6 +95,7 @@ export function performMove(board: Board, move: Move): Board {
     if (move.captured != null) {
         newBoard.pieces[move.captured.row][move.captured.column] = undefined;
     }
+    
     const movingPiece = newBoard.pieces[move.from.row][move.from.column];
     if (movingPiece == undefined) {
         throw new Error("Tried to move a nonexistent piece");
@@ -100,12 +103,16 @@ export function performMove(board: Board, move: Move): Board {
     if (movingPiece.color != board.state.turn) {
         throw new Error("attempted to move a piece outside of its turn");
     }
-
-    newBoard.pieces[move.to.row][move.to.column] = movingPiece;
+    // copy the piece being moved
+    const movedPiece = copyPiece(movingPiece);
+    // assign that copy
+    // this way, mutations to this piece by the function below
+    // do not affect the previous board state--it remains unchanged
+    newBoard.pieces[move.to.row][move.to.column] = movedPiece;
     newBoard.pieces[move.from.row][move.from.column] = undefined;
 
     // apply any special game rules and return
-    return applySpecialRules(newBoard, move, movingPiece, takenPiece);
+    return applySpecialRules(newBoard, move, movedPiece, takenPiece);
 }
 
 export function getValidMoves(board: Board, from: number): Move[] {
