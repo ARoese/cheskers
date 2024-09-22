@@ -39,3 +39,7 @@ export function reverseCoordinates(toReverse: Coordinates): Coordinates {
         column: toReverse.column
     };
 }
+
+export function coordsToString(coords : Coordinates) : string {
+    return `${coords.row},${coords.column}`;
+}

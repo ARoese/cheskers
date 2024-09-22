@@ -1,8 +1,16 @@
+import { PieceType } from "./games";
 import { CheckersPiece, expandMove as expandCheckersMove } from "./games/checkers";
 import { ChessPiece, expandMove as expandChessMove } from "./games/chess";
 import { Board, copyBoard, pieceAt } from "./types/Board";
 import { fromCoordinates, toCoordinates, Coordinates, MaybeCoordinates } from "./types/Coordinates";
 import { Piece, MaybePiece, copyPiece } from "./types/Piece";
+
+
+export type Move = {
+    from: Coordinates;
+    to: Coordinates;
+    captured: MaybeCoordinates;
+};
 
 //TODO: use immutable.ts or something similar to garuntee immutability
 //of the board. Immutability garuntee should be RECURSIVE.
@@ -35,7 +43,7 @@ export function applySpecialRules(newBoard: Board, move: Move, movingPiece: Piec
             (piece) => piece != undefined && piece.color == color
         )
     ) as [boolean, boolean];
-    console.log(hasRed, hasBlack);
+    //console.log(hasRed, hasBlack);
     if (!hasBlack) {
         newBoard.state.winner = "red";
     } else if (!hasRed) {
@@ -44,7 +52,7 @@ export function applySpecialRules(newBoard: Board, move: Move, movingPiece: Piec
 
     // checkers kinging and multi-attacking
     if (movingPiece.type == "single" && move.to.row == (movingPiece.color == "black" ? 7 : 0)) {
-        console.log("checker got kinged");
+        //console.log("checker got kinged");
         movingPiece.type = "double";
         // a kinged piece does not continue multi-attacking
         newBoard.state.multiCapturing = null;
@@ -75,7 +83,7 @@ export function applySpecialRules(newBoard: Board, move: Move, movingPiece: Piec
     });
     // a pawn the moves 2 spaces in 1 turn becomes pessantable
     if (movingPiece.type == "pawn" && Math.abs(move.from.row - move.to.row) == 2) {
-        console.log("pessantable created");
+        //console.log("pessantable created");
         movingPiece.type = "pessantable";
     }
 
@@ -154,8 +162,103 @@ export function getAllBoardMoves(board: Board): Record<number, Move[]> {
 
     return Object.fromEntries(allMoves);
 }
-export type Move = {
-    from: Coordinates;
-    to: Coordinates;
-    captured: MaybeCoordinates;
+
+type ValuedMove = {
+    value: number,
+    move: Move | null
 };
+
+type MoveResult = {
+    move: Move,
+    result: Board
+};
+
+/** values of each piece */
+const pieceValues : Record<PieceType, number> = {
+    double: 9,
+    single: 1,
+    pawn: 1, // these should match, they are both pawns
+    pessantable: 1,
+    king: 0, // should not affect ranking
+    queen: 9,
+    rook: 5,
+    bishop: 3,
+    knight: 3
+};
+
+/** Provide a heuristic rating for this board state */
+export function rateBoard(board: Board) : number {
+
+    // use piece value method
+    const boardValue = board.pieces.flat()
+        .filter((piece) => piece != undefined)
+        //black pieces have negative value
+        .map((piece) => piece.color == "black" ? -pieceValues[piece.type] : pieceValues[piece.type])
+        //sum piece values
+        .reduce((a, n) => a+n, 0);
+        
+    return boardValue;
+}
+
+/** return the ValuedMove with the maximum value */
+function maximum(moves : ValuedMove[]) : ValuedMove {
+    return moves.reduce((best, test) => test.value > best.value ? test : best, moves[0]);
+}
+
+/** return the ValuedMove with the minimum value */
+function minimum(moves : ValuedMove[]) : ValuedMove {
+    return moves.reduce((best, test) => test.value < best.value ? test : best, moves[0]);
+}
+
+// typical minimax
+function recBestMove(board: Board, depth: number) : ValuedMove {
+    // winning and losing boards have no moves and
+    // are given a maximum or minimum value
+    if(board.state.winner == "black"){
+        console.log("see win for black")
+        return {
+            move: null,
+            value: Number.NEGATIVE_INFINITY   
+        };
+    }else if(board.state.winner == "red"){
+        console.log("see win for red")
+        return {
+            move: null,
+            value: Number.POSITIVE_INFINITY   
+        };
+    }
+
+    // How to evaluate a given move result
+    const evaluator : (res : MoveResult) => number = depth <= 0 
+        ? (res) => rateBoard(res.result) // base case
+        : (res) => recBestMove(res.result, depth-1).value; // recursive case
+
+    const choices : ValuedMove[] = Object.values(getAllBoardMoves(board)).flat() // flatten into Moves[]
+        // perform all moves
+        .map((move) => ({move, result: performMove(board, move)}))
+        // evaluate moves by their resulting board
+        .map((res) => ({move: res.move, value: evaluator(res)}));
+
+    // if there is no move to do, but nobody has won
+    // I.E. a draw
+    if(choices.length == 0){
+        console.log("see draw");
+        return {
+            move: null,
+            // a draw is just barely better than a loss
+            value: board.state.turn == "red" // if red cannot move, they lose
+                ? Number.NEGATIVE_INFINITY+1 
+                : Number.POSITIVE_INFINITY-1
+        };
+    }
+
+    if(board.state.turn == "red"){
+        return maximum(choices); // red is trying to maximize
+    }else{
+        return minimum(choices); // black is trying to minimize
+    }
+}
+
+export function getBestMove(board: Board, depth: number): Move | null {
+    return recBestMove(board, depth).move;
+}
