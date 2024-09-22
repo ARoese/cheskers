@@ -163,16 +163,6 @@ export function getAllBoardMoves(board: Board): Record<number, Move[]> {
     return Object.fromEntries(allMoves);
 }
 
-type ValuedMove = {
-    value: number,
-    move: Move | null
-};
-
-type MoveResult = {
-    move: Move,
-    result: Board
-};
-
 /** values of each piece */
 const pieceValues : Record<PieceType, number> = {
     double: 9,
@@ -188,6 +178,15 @@ const pieceValues : Record<PieceType, number> = {
 
 /** Provide a heuristic rating for this board state */
 export function rateBoard(board: Board) : number {
+    // winning and losing boards have no moves and
+    // are given a maximum or minimum value
+    if(board.state.winner == "black"){
+        console.log("see win for black")
+        return Number.NEGATIVE_INFINITY;
+    }else if(board.state.winner == "red"){
+        console.log("see win for red")
+        return Number.POSITIVE_INFINITY;
+    }
 
     // use piece value method
     const boardValue = board.pieces.flat()
@@ -200,44 +199,22 @@ export function rateBoard(board: Board) : number {
     return boardValue;
 }
 
-/** return the ValuedMove with the maximum value */
-function maximum(moves : ValuedMove[]) : ValuedMove {
-    return moves.reduce((best, test) => test.value > best.value ? test : best, moves[0]);
-}
+type ValuedMove = {
+    value: number,
+    move: Move | null,
+    searched: number
+};
 
-/** return the ValuedMove with the minimum value */
-function minimum(moves : ValuedMove[]) : ValuedMove {
-    return moves.reduce((best, test) => test.value < best.value ? test : best, moves[0]);
-}
-
-// typical minimax
-function recBestMove(board: Board, depth: number) : ValuedMove {
-    // winning and losing boards have no moves and
-    // are given a maximum or minimum value
-    if(board.state.winner == "black"){
-        console.log("see win for black")
-        return {
-            move: null,
-            value: Number.NEGATIVE_INFINITY   
-        };
-    }else if(board.state.winner == "red"){
-        console.log("see win for red")
-        return {
-            move: null,
-            value: Number.POSITIVE_INFINITY   
-        };
+// typical minimax with a-b pruning
+function recBestMove(board: Board, depth: number, a: number, b: number) : ValuedMove {
+    if(depth <= 0){
+        return {move: null, value: rateBoard(board), searched: 1};
     }
 
-    // How to evaluate a given move result
-    const evaluator : (res : MoveResult) => number = depth <= 0 
-        ? (res) => rateBoard(res.result) // base case
-        : (res) => recBestMove(res.result, depth-1).value; // recursive case
+    // recBestMove(res.result, depth-1).value
 
-    const choices : ValuedMove[] = Object.values(getAllBoardMoves(board)).flat() // flatten into Moves[]
-        // perform all moves
-        .map((move) => ({move, result: performMove(board, move)}))
-        // evaluate moves by their resulting board
-        .map((res) => ({move: res.move, value: evaluator(res)}));
+    // flatten into Moves[]
+    const choices : Move[] = Object.values(getAllBoardMoves(board)).flat(); 
 
     // if there is no move to do, but nobody has won
     // I.E. a draw
@@ -248,17 +225,67 @@ function recBestMove(board: Board, depth: number) : ValuedMove {
             // a draw is just barely better than a loss
             value: board.state.turn == "red" // if red cannot move, they lose
                 ? Number.NEGATIVE_INFINITY+1 
-                : Number.POSITIVE_INFINITY-1
+                : Number.POSITIVE_INFINITY-1,
+            searched: 1
         };
     }
 
     if(board.state.turn == "red"){
-        return maximum(choices); // red is trying to maximize
+        const val : ValuedMove = {move: null, value: Number.NEGATIVE_INFINITY, searched: 0};
+        for(const choice of choices){
+            // perform the move
+            const resultBoard = performMove(board, choice);
+            // evaluate resulting board recursively
+            const result = recBestMove(resultBoard, depth-1, a, b);
+            val.searched += result.searched;
+            // if this move is better than the previous best,
+            // replace the previous best.
+            if(val.value < result.value){
+                val.move = choice;
+                val.value = result.value;
+            }
+
+            // if this move is better than the opposing player might allow,
+            // stop looking and return
+            if(val.value > b){
+                break;
+            }
+            // update bounds so black knows the value of the best move white has seen so far
+            // if black sees a move better than this, it can stop searching because white would
+            // never go down that path.
+            a = Math.max(val.value, a);
+        }
+        return val;
     }else{
-        return minimum(choices); // black is trying to minimize
+        const val : ValuedMove = {move: null, value: Number.POSITIVE_INFINITY, searched: 0};
+        for(const choice of choices){
+            // perform the move
+            const resultBoard = performMove(board, choice);
+            // evaluate resulting board recursively
+            const result = recBestMove(resultBoard, depth-1, a, b);
+            val.searched += result.searched;
+            // if this move is better than the previous best,
+            // replace the previous best.
+            if(val.value > result.value){
+                val.move = choice;
+                val.value = result.value;
+            }
+
+            // if this move is better than the opposing player might allow,
+            // stop looking and return
+            if(val.value < a){
+                break;
+            }
+            // update bounds so black knows the value of the best move white has seen so far
+            // if black sees a move better than this, it can stop searching because white would
+            // never go down that path.
+            b = Math.min(val.value, b);
+        }
+        return val;
     }
 }
 
-export function getBestMove(board: Board, depth: number): Move | null {
-    return recBestMove(board, depth).move;
+export function getBestMove(board: Board, depth: number): [Move | null, number] {
+    const bestMove = recBestMove(board, depth, Number.NEGATIVE_INFINITY, Number.POSITIVE_INFINITY);
+    return [bestMove.move, bestMove.searched];
 }

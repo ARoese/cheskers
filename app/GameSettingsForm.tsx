@@ -85,6 +85,23 @@ function GameSettingsForm({options, setGameSettings} : args) {
                     }
                 />
             </p>
+            <p>AI search depth:
+                <input 
+                    type="number" 
+                    min="0"
+                    max="5"
+                    className="text-black"
+                    value={options.searchDepth}
+                    onChange={
+                        (e) => {
+                            setGameSettings({
+                                ...options,
+                                searchDepth: Number.parseInt(e.target.value)
+                            });
+                        }
+                    }
+                />
+            </p>
         </div>
     );
 }

@@ -10,14 +10,16 @@ export type GameOptions = {
     white: Game,
     black: Game,
     realPlayer: Color,
-    autoMove: boolean
+    autoMove: boolean,
+    searchDepth: number
 };
 
 const defaultOptions : GameOptions = {
     white: "chess",
     black: "checkers", 
     realPlayer: "red",
-    autoMove: false
+    autoMove: false,
+    searchDepth: 2
 };
 
 function Game({className=""} : {className? : string}) {
@@ -28,7 +30,11 @@ function Game({className=""} : {className? : string}) {
         setBoard(nextBoard);
     }
 
-    const bestMove = useMemo(() => getBestMove(board, 2), [board]);
+    const [bestMove, searched] = useMemo(() => {
+            const depth = isNaN(options.searchDepth) ? 0 : options.searchDepth;
+            return getBestMove(board, depth);
+        },
+        [board, options.searchDepth]);
 
     if(options.autoMove && board.state.turn != options.realPlayer && bestMove != null){
         doMove(bestMove);
@@ -66,6 +72,7 @@ function Game({className=""} : {className? : string}) {
                         : "none"
                     }
                 </p>
+                <p>searched {searched} terminals to find this best move.</p>
             </div>
         </div>
      );
