@@ -1,0 +1,4 @@
+services:
+  cheskers:
+    build: .
+    restart: unless-stopped

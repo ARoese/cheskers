@@ -5,7 +5,6 @@ import { makeBoard, pieceAt } from "./lib/types/Board";
 import { coordsToString, fromCoordinates, toCoordinates } from "./lib/types/Coordinates";
 import { Color } from "./lib/games";
 
-
 function getValidMovesCombined(boardMoves : Record<number, Move[]>, selected : number | null) : [Move[], Record<number, Move[]>]{
     const validMoves = selected == null ? [] : boardMoves[selected];
     const movesOnto : Record<number, Move[]> = Object.fromEntries(
