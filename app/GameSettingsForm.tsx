@@ -89,7 +89,7 @@ function GameSettingsForm({options, setGameSettings} : args) {
                 <input 
                     type="number" 
                     min="0"
-                    max="5"
+                    max="8"
                     className="text-black"
                     value={options.searchDepth}
                     onChange={
