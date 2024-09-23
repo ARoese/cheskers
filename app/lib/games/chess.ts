@@ -66,7 +66,7 @@ const pawnExpands = (board: Board, location: Coordinates): Move[] => {
             captured: null
         }
     ]
-    if(location.row == 1){
+    if(location.row == 1 && !pieceAt(board, advances[0].to)){
         advances.push({
             from: location,
             to: addCoords(scaleCoords(2,up), location),
