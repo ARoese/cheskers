@@ -30,19 +30,19 @@ function Game({className=""} : {className? : string}) {
         setBoard(nextBoard);
     }
 
-    const [bestMove, searched] = useMemo(() => {
+    const bestMove = useMemo(() => {
             const depth = isNaN(options.searchDepth) ? 0 : options.searchDepth;
             return getBestMove(board, depth);
         },
         [board, options.searchDepth]);
 
-    if(options.autoMove && board.state.turn != options.realPlayer && bestMove != null){
-        doMove(bestMove);
+    if(options.autoMove && board.state.turn != options.realPlayer && bestMove.move != null){
+        doMove(bestMove.move);
     }
 
     return ( 
         <div className={className}>
-            <button onClick={() => bestMove != null ? doMove(bestMove) : null}>
+            <button onClick={() => bestMove.move != null ? doMove(bestMove.move) : null}>
                 Play best move
             </button>
             <GameSettingsForm options={options} setGameSettings={(o) => {setOptions(o); console.log("called setO")}}/>
@@ -65,14 +65,15 @@ function Game({className=""} : {className? : string}) {
                 </p>
                 <p>Winner: {board.state.winner == null ? "none" : board.state.winner}</p>
                 <p>Board rating: {rateBoard(board)}</p>
-                <p>
+                <p suppressHydrationWarning>
                     Best move: {
-                        bestMove != null 
-                        ? `${coordsToString(bestMove.from)} => ${coordsToString(bestMove.to)}`
+                        bestMove.move != null 
+                        ? `${coordsToString(bestMove.move.from)} => ${coordsToString(bestMove.move.to)}`
                         : "none"
                     }
                 </p>
-                <p>searched {searched} terminals to find this best move.</p>
+                <p>Best move value: {bestMove.value}</p>
+                <p>searched {bestMove.searched} terminals to find this best move.</p>
             </div>
         </div>
      );

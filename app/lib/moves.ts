@@ -207,7 +207,7 @@ type ValuedMove = {
 
 // typical minimax with a-b pruning
 function recBestMove(board: Board, depth: number, a: number, b: number) : ValuedMove {
-    if(depth <= 0){
+    if(depth <= 0 || board.state.winner != null){
         return {move: null, value: rateBoard(board), searched: 1};
     }
 
@@ -230,9 +230,14 @@ function recBestMove(board: Board, depth: number, a: number, b: number) : Valued
         };
     }
 
+    // check captures first
+    const sortedChoices = [
+        ...choices.filter((choice) => choice.captured != null), 
+        ...choices.filter((choice) => choice.captured == null)
+    ];
     if(board.state.turn == "red"){
-        const val : ValuedMove = {move: null, value: Number.NEGATIVE_INFINITY, searched: 0};
-        for(const choice of choices){
+        const val : ValuedMove = {move: choices[0], value: Number.NEGATIVE_INFINITY, searched: 0};
+        for(const choice of sortedChoices){
             // perform the move
             const resultBoard = performMove(board, choice);
             // evaluate resulting board recursively
@@ -247,7 +252,7 @@ function recBestMove(board: Board, depth: number, a: number, b: number) : Valued
 
             // if this move is better than the opposing player might allow,
             // stop looking and return
-            if(val.value > b){
+            if(val.value >= b){
                 break;
             }
             // update bounds so black knows the value of the best move white has seen so far
@@ -257,8 +262,8 @@ function recBestMove(board: Board, depth: number, a: number, b: number) : Valued
         }
         return val;
     }else{
-        const val : ValuedMove = {move: null, value: Number.POSITIVE_INFINITY, searched: 0};
-        for(const choice of choices){
+        const val : ValuedMove = {move: choices[0], value: Number.POSITIVE_INFINITY, searched: 0};
+        for(const choice of sortedChoices){
             // perform the move
             const resultBoard = performMove(board, choice);
             // evaluate resulting board recursively
@@ -273,7 +278,7 @@ function recBestMove(board: Board, depth: number, a: number, b: number) : Valued
 
             // if this move is better than the opposing player might allow,
             // stop looking and return
-            if(val.value < a){
+            if(val.value <= a){
                 break;
             }
             // update bounds so black knows the value of the best move white has seen so far
@@ -285,7 +290,7 @@ function recBestMove(board: Board, depth: number, a: number, b: number) : Valued
     }
 }
 
-export function getBestMove(board: Board, depth: number): [Move | null, number] {
+export function getBestMove(board: Board, depth: number): ValuedMove {
     const bestMove = recBestMove(board, depth, Number.NEGATIVE_INFINITY, Number.POSITIVE_INFINITY);
-    return [bestMove.move, bestMove.searched];
+    return bestMove;
 }
