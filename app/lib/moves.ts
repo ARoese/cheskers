@@ -205,6 +205,9 @@ type ValuedMove = {
     searched: number
 };
 
+// TODO: nudge the valuation to make deeper (more distant) losses more appealing than shallow
+// losses. This would prevent agents from completely losing all will to live when there is
+// a potential forced-mate.
 // typical minimax with a-b pruning
 function recBestMove(board: Board, depth: number, a: number, b: number) : ValuedMove {
     if(depth <= 0 || board.state.winner != null){
