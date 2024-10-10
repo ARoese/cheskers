@@ -75,7 +75,7 @@ export function makeBoard(white: Game, black: Game): Board {
 
     // populate black's side
     if (board.black == "chess") { // as chess
-        const whiteBackRow = ["rook", "knight", "bishop", "king", "queen", "bishop", "knight", "rook"] as PieceType[];
+        const whiteBackRow = ["rook", "knight", "bishop", "queen", "king", "bishop", "knight", "rook"] as PieceType[];
         board.pieces[0] = whiteBackRow.map((type) => makePiece(type, "black", "chess"));
         board.pieces[1] = [...Array(8).keys()].map(() => makePiece("pawn", "black", "chess"));
     } else { // as checkers
